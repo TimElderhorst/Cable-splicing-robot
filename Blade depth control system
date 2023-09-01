@@ -1,0 +1,109 @@
+// Author: Tim Elderhorst
+// This program is used to automatically adjust the blade depth of a cable splicing robot, based on input from a computer vision system.
+// The program employs a moving average filter on the input signal, followed by PID control. 
+// If the PID value exceeds the threshold value, a stepper motor will be actuated. 
+// A 5s delay is inserted after every control action to improve stability of the control loop.
+
+#define speed 9600
+String input;
+#include <Stepper.h>
+
+// Define pins for A4988 stepper driver (for blade depth adjustment)
+#define dirPin 6
+#define stepPin 5
+#define stepsPerRevolution 800
+
+Stepper stepperX(stepsPerRevolution, stepPin, dirPin);
+char incomingByte; // define a variable to store incoming serial data
+
+void setup() {
+  // put your setup code here, to run once:
+
+  Serial.begin(speed);
+  Serial1.begin(speed);
+  Serial1.flush();
+  stepperX.setSpeed(150);
+}
+
+// int t;
+// float omega = 3 * PI / 180; // period = 1.16 seconds
+// int phi = 45;
+int B = 0;
+int C = 0;
+// int y2 = 0;
+  
+#define WINDOW_SIZE 34   //window size = 120 for simulation. For real-time use: window size depends on chip velocity. 
+
+int INDEX = 0;
+double SUM = 666;
+int READINGS[WINDOW_SIZE];
+double AVERAGED = 666;
+double error = 0;
+double cumulative_error = 0;
+double Kp = 0.02;
+double Ki = 0.003;
+double Kd = 0.0;
+double p_value = 0;
+double i_value = 0;
+double d_value = 0;
+double pid_value = 0;
+int timer = 0;
+unsigned long prevTime_motor = 0;
+long motor_interval = 5000;
+  
+
+void loop() {
+  unsigned char data_in = 0;
+  char data_out[8] = "\r\n";
+
+  if ((Serial1.available() > 0) & (Serial.availableForWrite() > 0)){
+    data_in = Serial1.read();
+//    sprintf(data_out, "%u\r\n", ((int)data_in + 245) << 1);
+    int buffer = (((int)data_in + 245) << 1);
+    Serial.print(buffer);
+    
+ //     for (t = 0; t<360; t++) {
+    SUM = SUM - READINGS[INDEX];       // Remove the oldest entry from the sum
+ //   int y1 = 70 * sin( (omega * t) + phi) + B + C;
+ //   int y2 = 50 * sin((9.3*omega*t) + phi);
+ //   int y3 = y1 + y2;
+    
+  READINGS[INDEX] = buffer;           // Add the newest reading to the window
+  SUM = SUM + READINGS[INDEX];                 // Add the newest reading to the sum
+  INDEX = (INDEX+1) % WINDOW_SIZE;   // Increment the index, and wrap to 0 if it exceeds the window size
+  timer = timer+1;
+  AVERAGED = ((SUM - READINGS[0])/ WINDOW_SIZE) ;      // Divide the sum of the window by the window size for the result
+
+  if (timer > WINDOW_SIZE) {
+    timer = WINDOW_SIZE;
+//    error = 666 - AVERAGED + B - C;
+    error = 666 - AVERAGED + B;
+    cumulative_error = cumulative_error + 0.01 * error;
+    p_value = error * Kp;
+    i_value = cumulative_error * Ki;
+    pid_value = p_value + i_value + d_value;
+
+//    C += pid_value;   //OPTION 1
+
+    if (millis() - prevTime_motor > motor_interval){    //OPTION 2
+      if (pid_value > 2.0){
+        C += 80;
+        stepperX.step(-204); // 204 steps = +0.1 mm
+      }
+      if (pid_value < -2.0) {
+        C -= 80;
+        stepperX.step(204); // 204 steps = -0.1 mm
+      }
+      prevTime_motor = millis();
+    }                                   //end OPTION 2
+  }
+//    Serial.print(y3);
+    Serial.print("    ");
+    Serial.print(AVERAGED);
+    Serial.print("    ");
+    Serial.print(error);
+    Serial.print("    ");
+    Serial.print(C);
+    Serial.println();
+    }
+}
