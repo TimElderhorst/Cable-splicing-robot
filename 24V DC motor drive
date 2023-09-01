@@ -1,0 +1,22 @@
+// Author: Tim Elderhorst 
+// This program can be used to activate DC motors using a DC motor shield.
+
+int motorPin = 3; // PWM pin for motor speed control
+int dirPin = 4;   // Direction pin for motor
+
+void setup() {
+  pinMode(motorPin, OUTPUT); // sets the motor pin as an output
+  pinMode(dirPin, OUTPUT);   // sets the direction pin as an output
+}
+
+void loop() {
+  // forward rotation
+  digitalWrite(dirPin, HIGH);   // sets the direction pin to high for forward rotation
+  analogWrite(motorPin, 255);   // sets the motor speed to full
+//  delay(1000);                  // waits for 1 second
+  
+  // backward rotation
+//  digitalWrite(dirPin, LOW);    // sets the direction pin to low for backward rotation
+//  analogWrite(motorPin, 255);   // sets the motor speed to full
+//  delay(1000);                  // waits for 1 second
+}
